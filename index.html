@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FlowEntry — Liquidity Flow Detection</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#08090d;--card:#111318;--card-alt:#161920;--border:#1e2230;
+  --gold:#c9a227;--gold-light:#e8c84a;--gold-dim:#a0841e;
+  --green:#22c55e;--green-dim:#166534;--red:#ef4444;--red-dim:#7f1d1d;
+  --text:#e4e4e7;--text-dim:#71717a;--text-mid:#a1a1aa;
+  --blue:#3b82f6;--purple:#8b5cf6;
+  --accent1:rgba(201,162,39,0.08);--accent2:rgba(201,162,39,0.15);
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;line-height:1.4}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+input{font-family:inherit}
+table{width:100%;border-collapse:collapse}
+
+/* Header */
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:8px;cursor:pointer}
+.logo-icon{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--gold),var(--gold-dim));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:var(--bg)}
+.logo-text{font-size:16px;font-weight:800;color:var(--gold);letter-spacing:-0.3px}
+.nav{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;flex:1;margin:0 8px}
+.nav-btn{background:transparent;color:var(--text-dim);border:none;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:500;transition:all 0.2s;white-space:nowrap}
+.nav-btn.active{background:var(--accent2);color:var(--gold);font-weight:700}
+.lang-btn{background:var(--accent1);color:var(--gold);border:1px solid rgba(201,162,39,0.2);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;white-space:nowrap}
+.container{max-width:960px;margin:0 auto;padding:20px 16px}
+
+/* Page sections */
+.page{display:none}.page.active{display:block}
+
+/* Pill */
+.pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:0.3px;white-space:nowrap;display:inline-block}
+
+/* Stat Box */
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 16px;text-align:center;flex:1;min-width:120px}
+.stat-box.big{padding:28px 20px;min-width:150px}
+.stat-val{font-size:26px;font-weight:800;color:var(--gold);letter-spacing:-1px;line-height:1.1}
+.stat-box.big .stat-val{font-size:36px}
+.stat-label{font-size:12px;font-weight:600;color:var(--text);margin-top:6px;letter-spacing:0.5px}
+.stat-sub{font-size:11px;color:var(--text-dim);margin-top:3px}
+
+/* Benefit Card */
+.benefit-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 16px;flex:1 1 calc(33% - 8px);min-width:170px}
+.benefit-icon{font-size:26px;margin-bottom:8px}
+.benefit-title{font-size:14px;font-weight:700;color:var(--gold);margin-bottom:5px}
+.benefit-desc{font-size:12px;color:var(--text-dim);line-height:1.5}
+
+/* Section Title */
+.section-title{text-align:center;padding:24px 0 16px}
+.section-tag{font-size:11px;font-weight:700;color:var(--gold);letter-spacing:3px;margin-bottom:8px;text-transform:uppercase}
+.section-main{font-size:26px;font-weight:900;margin:0 0 6px;color:var(--text)}
+.section-sub{font-size:13px;color:var(--text-dim);margin:0 auto;max-width:560px}
+
+/* Flex helpers */
+.flex{display:flex}.flex-wrap{flex-wrap:wrap}.gap-8{gap:8px}.gap-10{gap:10px}.gap-12{gap:12px}.gap-14{gap:14px}
+.justify-center{justify-content:center}.items-center{align-items:center}
+.text-center{text-align:center}.mb-4{margin-bottom:4px}.mb-8{margin-bottom:8px}.mb-10{margin-bottom:10px}.mb-14{margin-bottom:14px}.mb-16{margin-bottom:16px}.mb-20{margin-bottom:20px}.mb-24{margin-bottom:24px}.mb-28{margin-bottom:28px}
+
+/* Trade Card */
+.trade-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;flex:1 1 calc(33% - 8px);min-width:200px}
+.watch-card{background:var(--card);border:1px solid rgba(201,162,39,0.13);border-radius:10px;padding:10px 14px;flex:1 1 calc(33% - 6px);min-width:180px}
+
+/* Elite note */
+.elite-note{background:var(--accent1);border:1px solid rgba(201,162,39,0.13);border-radius:8px;padding:8px 14px;text-align:center;margin-top:8px}
+.elite-note span{font-size:11px;color:var(--gold);font-weight:600}
+
+/* Live dot */
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.live-dot.ok{background:var(--green);animation:pulse 2s infinite}
+.live-dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* Table */
+.data-table{font-size:12px}
+.data-table th{padding:10px 8px;text-align:left;color:var(--text-dim);border-bottom:2px solid var(--border);font-size:11px;font-weight:600;white-space:nowrap;user-select:none}
+.data-table th.sortable{cursor:pointer}
+.data-table th.sorted{color:var(--gold)}
+.data-table td{padding:8px 10px}
+.data-table tr:nth-child(even){background:rgba(17,19,24,0.27)}
+.data-table tr:hover{background:var(--accent1)}
+
+/* Progress bar (detection) */
+.det-bar{width:50px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}
+.det-fill{height:100%;border-radius:3px}
+
+/* FAQ */
+.faq-item{border-bottom:1px solid var(--border)}
+.faq-q{padding:16px 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.faq-q span:first-child{font-size:14px;font-weight:600;color:var(--text);padding-right:16px}
+.faq-toggle{color:var(--gold);font-size:18px;transition:transform 0.2s;flex-shrink:0}
+.faq-a{font-size:13px;color:var(--text-dim);line-height:1.7;padding-bottom:16px;display:none}
+.faq-item.open .faq-a{display:block}
+.faq-item.open .faq-toggle{transform:rotate(45deg)}
+
+/* How step */
+.how-step{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:10px;display:flex;gap:16px;align-items:flex-start}
+.how-icon{width:48px;height:48px;border-radius:12px;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.step-badge{background:var(--gold);color:var(--bg);font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;display:inline-block;margin-right:8px}
+
+/* Pricing */
+.price-card{background:var(--card);border-radius:16px;padding:24px;flex:1 1 280px;max-width:360px}
+.price-card.elite{border:1px solid var(--gold);position:relative;box-shadow:0 0 30px rgba(201,162,39,0.08)}
+.price-card.free{border:1px solid var(--border)}
+.best-badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--bg);font-size:10px;font-weight:800;padding:3px 14px;border-radius:20px;letter-spacing:1px}
+
+/* Sim button */
+.sim-btn{border-radius:10px;padding:12px 24px;font-size:16px;font-weight:800;border:1px solid var(--border);background:var(--card);color:var(--text-dim);transition:all 0.2s}
+.sim-btn.active{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+
+/* Tab button */
+.tab-btn{background:transparent;color:var(--text-dim);border:1px solid var(--border);padding:7px 18px;border-radius:8px;font-size:12px;font-weight:500;transition:all 0.2s}
+.tab-btn.active{background:var(--accent2);color:var(--gold);border-color:rgba(201,162,39,0.27);font-weight:700}
+
+/* Search */
+.search-input{flex:1;min-width:160px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;outline:none}
+
+/* Compare */
+.compare-panel{background:var(--card-alt);border:1px solid rgba(201,162,39,0.2);border-radius:12px;padding:16px;margin-bottom:14px}
+.compare-card{background:var(--card);border-radius:10px;padding:16px;min-width:180px;flex:1}
+
+/* RTL */
+[dir="rtl"] .faq-q span:first-child{padding-right:0;padding-left:16px}
+[dir="rtl"] .step-badge{margin-right:0;margin-left:8px}
+[dir="rtl"] .how-step{direction:rtl}
+
+/* Footer */
+.footer{border-top:1px solid var(--border);margin-top:40px;padding-top:20px;text-align:center}
+.footer div:first-child{font-size:12px;color:var(--text-dim);margin-bottom:6px}
+.footer div:last-child{font-size:11px;color:var(--text-dim);opacity:0.5}
+
+/* Responsive */
+@media(max-width:600px){
+  .nav{gap:0;margin:0 4px}
+  .nav-btn{padding:4px 6px;font-size:10px}
+  .stat-box.big .stat-val{font-size:28px}
+  .benefit-card{min-width:140px;flex:1 1 calc(50% - 6px)}
+  .trade-card,.watch-card{min-width:100%;flex:1 1 100%}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Telegram Mini App */
+.tg-loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.4s}
+.tg-loading-overlay.hide{opacity:0;pointer-events:none}
+.tg-loading-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tg-access-badge{position:fixed;top:48px;right:12px;z-index:101;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px}
+[dir="rtl"] .tg-access-badge{right:auto;left:12px}
+.tg-access-badge.elite{background:rgba(201,162,39,0.15);color:var(--gold);border:1px solid rgba(201,162,39,0.3)}
+.tg-access-badge.free{background:rgba(113,113,122,0.12);color:var(--text-dim);border:1px solid rgba(113,113,122,0.2)}
+.tg-upgrade-banner{background:linear-gradient(135deg,#1a1510,var(--card));border:1px solid rgba(201,162,39,0.25);border-radius:12px;padding:14px 18px;margin-top:12px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.tg-upgrade-banner:hover{border-color:var(--gold)}
+</style>
+</head>
+<body>
+
+<!-- Telegram Mini App Loading Overlay -->
+<div class="tg-loading-overlay" id="tgLoading">
+  <div class="tg-loading-spinner"></div>
+  <div style="font-size:14px;color:var(--text-dim)">Loading FlowEntry...</div>
+</div>
+
+<!-- Access Badge (shows Elite or Free) -->
+<div class="tg-access-badge free" id="accessBadge" style="display:none"></div>
+
+<!-- ===== HEADER ===== -->
+<div class="header" id="header">
+  <div class="logo" onclick="goPage(0)">
+    <div class="logo-icon">F</div>
+    <span class="logo-text">FlowEntry</span>
+  </div>
+  <div class="nav" id="nav"></div>
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()"></button>
+</div>
+
+<div class="container">
+
+<!-- ===== PAGE 0: OVERVIEW ===== -->
+<div class="page" id="page0">
+  <div style="text-align:center;padding:28px 0 20px">
+    <div class="section-tag" data-t="heroTag"></div>
+    <h1 style="font-size:30px;font-weight:900;margin:0 0 10px;line-height:1.15" data-t="heroTitle"></h1>
+    <p style="font-size:15px;color:var(--text-dim);margin:0 auto;max-width:520px" data-t="heroSub"></p>
+  </div>
+  <div class="flex flex-wrap gap-10 mb-24" id="heroStats"></div>
+
+  <!-- Funnel -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:24px;text-align:center">
+    <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:16px;letter-spacing:0.5px" data-t="funnelTitle"></div>
+    <div id="funnel"></div>
+  </div>
+
+  <!-- Benefits -->
+  <h2 style="font-size:18px;font-weight:800;text-align:center;margin-bottom:14px" data-t="benefitsTitle"></h2>
+  <div class="flex flex-wrap gap-10 mb-24" id="benefits"></div>
+
+  <!-- TV Indicators -->
+  <div style="background:var(--accent1);border:1px solid rgba(201,162,39,0.13);border-radius:12px;padding:16px;margin-bottom:24px">
+    <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:6px" data-t="tvTitle"></div>
+    <div style="font-size:12px;color:var(--text-dim);line-height:1.6" data-t="tvDesc"></div>
+  </div>
+
+  <!-- Telegram CTA -->
+  <div style="background:linear-gradient(135deg,var(--card),#141824);border:1px solid rgba(59,130,246,0.2);border-radius:14px;padding:20px;margin-bottom:28px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div style="font-size:36px">📲</div>
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px" data-t="tgTitle"></div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.6" data-t="tgDesc"></div>
+    </div>
+    <a href="https://t.me/flowentry3" target="_blank" style="background:rgba(59,130,246,0.13);border:1px solid rgba(59,130,246,0.27);border-radius:10px;padding:10px 20px;text-align:center">
+      <div style="font-size:12px;font-weight:700;color:var(--blue)" data-t="tgBtn"></div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">t.me/flowentry3</div>
+    </a>
+  </div>
+
+  <!-- Live Trades -->
+  <div class="mb-24">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h2 style="font-size:18px;font-weight:800" data-t="liveTitle"></h2>
+      <div style="font-size:10px;color:var(--text-dim);display:flex;align-items:center" id="liveStatus"></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px" data-t="liveSub"></p>
+    <div class="flex flex-wrap gap-10 mb-8" id="liveTradesContainer"></div>
+    <div id="liveTradesNote"></div>
+    <h3 style="font-size:14px;font-weight:700;color:var(--gold);margin:18px 0 10px" data-t="watchTitle"></h3>
+    <div class="flex flex-wrap gap-8 mb-8" id="watchContainer"></div>
+    <div id="watchNote"></div>
+  </div>
+
+  <!-- Closed Trades -->
+  <h2 style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px" data-t="closedTitle"></h2>
+  <p style="font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:14px" data-t="closedSub"></p>
+  <div style="overflow-x:auto" id="overviewTable"></div>
+</div>
+
+<!-- ===== PAGE 1: PULSE ===== -->
+<div class="page" id="page1">
+  <div class="section-title">
+    <div class="section-tag" data-t="pulseTag"></div>
+    <h1 class="section-main" data-t="pulseTitle"></h1>
+    <p class="section-sub" data-t="pulseSub"></p>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px">
+    <p style="font-size:14px;color:var(--text-dim);line-height:1.8" data-t="pulseDesc"></p>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px" data-t="pulseHow"></h3>
+    <div id="pulseSteps"></div>
+  </div>
+  <h3 style="font-size:15px;font-weight:700;margin-bottom:12px" data-t="pulseRead"></h3>
+  <div id="pulseColors"></div>
+  <div style="background:var(--accent1);border:1px solid rgba(201,162,39,0.13);border-radius:12px;padding:16px;text-align:center;margin-top:20px">
+    <div style="font-size:13px;color:var(--gold);font-weight:600" data-t="pulseTv"></div>
+  </div>
+  <div style="background:var(--card);border:1px solid rgba(139,92,246,0.2);border-radius:14px;padding:24px;margin-top:20px">
+    <h3 style="font-size:15px;font-weight:700;color:var(--purple);margin-bottom:8px" data-t="srTitle"></h3>
+    <p style="font-size:13px;color:var(--text-dim);line-height:1.7" data-t="srDesc"></p>
+  </div>
+</div>
+
+<!-- ===== PAGE 2: COINS ===== -->
+<div class="page" id="page2">
+  <div class="section-title">
+    <h1 class="section-main" data-t="coinsTitle"></h1>
+    <p class="section-sub" data-t="coinsSub"></p>
+  </div>
+  <div class="flex flex-wrap gap-8 mb-14 items-center">
+    <input class="search-input" id="coinSearch" oninput="renderCoins()" placeholder="">
+    <button class="tab-btn active" id="tabTop30" onclick="setCoinTab('top30')"></button>
+    <button class="tab-btn" id="tabAll" onclick="setCoinTab('all')"></button>
+    <button class="tab-btn" id="compareBtn" style="display:none" onclick="toggleComparePanel()"></button>
+  </div>
+  <div id="comparePanel" style="display:none"></div>
+  <div style="overflow-x:auto" id="coinTableContainer"></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:12px;text-align:center" id="coinNote"></div>
+</div>
+
+<!-- ===== PAGE 3: SIMULATOR ===== -->
+<div class="page" id="page3">
+  <div class="section-title">
+    <h1 class="section-main" data-t="simTitle"></h1>
+    <p class="section-sub" data-t="simSub"></p>
+  </div>
+  <div class="flex gap-8 justify-center mb-24" id="simButtons"></div>
+  <div style="text-align:center;font-size:12px;color:var(--text-dim);margin-bottom:20px" data-t="simSelect"></div>
+  <div class="flex flex-wrap gap-12 justify-center mb-28" id="simStats"></div>
+  <div style="background:var(--card);border-radius:14px;padding:24px;margin-bottom:20px" id="simBars"></div>
+  <p style="font-size:13px;color:var(--text-dim);line-height:1.7;text-align:center;max-width:560px;margin:0 auto 20px" data-t="simDesc"></p>
+  <div style="background:rgba(127,29,29,0.13);border:1px solid rgba(239,68,68,0.13);border-radius:10px;padding:14px;text-align:center">
+    <p style="font-size:11px;color:var(--red);margin:0;opacity:0.8" data-t="simWarn"></p>
+  </div>
+</div>
+
+<!-- ===== PAGE 4: TRACK RECORD ===== -->
+<div class="page" id="page4">
+  <div class="section-title">
+    <h1 class="section-main" data-t="trTitle"></h1>
+    <p class="section-sub" data-t="trSub"></p>
+  </div>
+  <div class="flex flex-wrap gap-10 mb-20" id="trStats"></div>
+  <div class="flex flex-wrap gap-10 mb-24">
+    <div style="flex:1;min-width:200px;background:rgba(22,101,52,0.13);border:1px solid rgba(34,197,94,0.13);border-radius:10px;padding:14px;text-align:center">
+      <div style="font-size:13px;color:var(--green);font-weight:700" data-t="trGreen"></div>
+    </div>
+    <div style="flex:1;min-width:200px;background:var(--accent1);border:1px solid rgba(201,162,39,0.13);border-radius:10px;padding:14px">
+      <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:4px" data-t="trRawTitle"></div>
+      <div style="font-size:11px;color:var(--text-dim);line-height:1.5" data-t="trRawDesc"></div>
+    </div>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:14px" data-t="trMethod"></h3>
+    <div id="trMethodSteps"></div>
+  </div>
+  <div style="overflow-x:auto" id="trTable"></div>
+  <div style="font-size:11px;color:var(--text-dim);text-align:center;margin-top:12px" data-t="trLast"></div>
+</div>
+
+<!-- ===== PAGE 5: HOW TO USE ===== -->
+<div class="page" id="page5">
+  <div class="section-title">
+    <div class="section-tag" data-t="howTag"></div>
+    <h1 class="section-main" data-t="howTitle"></h1>
+    <p class="section-sub" data-t="howSub"></p>
+  </div>
+  <div id="howSteps"></div>
+  <div style="background:var(--card);border:1px solid rgba(139,92,246,0.2);border-radius:14px;padding:20px;margin-top:16px">
+    <h3 style="font-size:15px;font-weight:700;color:var(--purple);margin-bottom:8px" data-t="howTvTitle"></h3>
+    <p style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:8px" data-t="howTvDesc"></p>
+    <div class="flex flex-wrap gap-8" id="howTvItems"></div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:10px" data-t="howTvNote"></p>
+  </div>
+</div>
+
+<!-- ===== PAGE 6: PRICING ===== -->
+<div class="page" id="page6">
+  <div class="section-title">
+    <div class="section-tag" data-t="priceTag"></div>
+    <h1 class="section-main" data-t="priceTitle"></h1>
+    <p class="section-sub" data-t="priceSub"></p>
+  </div>
+  <div class="flex flex-wrap gap-14 mb-28 justify-center" id="priceCards"></div>
+  <!-- Founder -->
+  <div style="background:linear-gradient(135deg,#1a1510,var(--card));border:1px solid rgba(201,162,39,0.2);border-radius:14px;padding:24px;text-align:center;margin-bottom:20px" id="founderBox"></div>
+  <!-- Math -->
+  <div style="background:var(--card);border-radius:12px;padding:20px;text-align:center;margin-bottom:12px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:8px" data-t="mathTitle"></div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7" data-t="mathDesc"></div>
+  </div>
+  <div style="background:var(--accent1);border:1px solid rgba(201,162,39,0.13);border-radius:10px;padding:12px;text-align:center">
+    <div style="font-size:12px;color:var(--gold);font-weight:600" data-t="mathUSDT"></div>
+  </div>
+</div>
+
+<!-- ===== PAGE 7: FAQ ===== -->
+<div class="page" id="page7">
+  <div class="section-title">
+    <h1 class="section-main" data-t="faqTitle"></h1>
+  </div>
+  <div style="max-width:640px;margin:0 auto" id="faqContainer"></div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <div data-t="foot1"></div>
+  <div data-t="foot2"></div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ==========================================
+// CONFIG — CHANGE THESE GIDs TO YOUR OWN
+// ==========================================
+const SHEET_PUB_KEY = "2PACX-1vSjJNpUA4At0-T8tpQXguNlHB1z2JO2__Gb_K0jwYR_f8FpjQmjEl49ezAevSXERTxJomZwvX8tuDnO";
+const GIDS = {
+  openTrades: 999126900,       // ← Replace with your Open Trades tab GID
+  watching: 642087203,         // ← Replace with your Watching tab GID
+  trackRecord: 13417130,      // ← Replace with your Track Record tab GID
+  stats: 547441627,            // ← Replace with your Stats tab GID
+};
+const REFRESH_SEC = 60;
+function csvUrl(gid){ return `https://docs.google.com/spreadsheets/d/e/${SHEET_PUB_KEY}/pub?gid=${gid}&single=true&output=csv`; }
+
+// ==========================================
+// ELITE ACCESS — SEPARATE GOOGLE SHEET
+// ==========================================
+const ELITE_SHEET_ID = "1pPA5OjjTZnUvad_TnlYMCrOAqcy6k8mzBnrlHkNiKOc";
+const ELITE_GID = 0;
+function eliteCsvUrl(){ return `https://docs.google.com/spreadsheets/d/${ELITE_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${ELITE_GID}`; }
+
+let isElite = false;
+let tgUserId = null;
+let tgUserName = '';
+
+// Detect Telegram user
+try {
+  const tgApp = window.Telegram && window.Telegram.WebApp;
+  if(tgApp){
+    tgApp.ready();
+    tgApp.expand();
+    tgApp.setHeaderColor('#08090d');
+    tgApp.setBackgroundColor('#08090d');
+    const user = tgApp.initDataUnsafe && tgApp.initDataUnsafe.user;
+    if(user){
+      tgUserId = String(user.id);
+      tgUserName = user.first_name || '';
+    }
+  }
+}catch(e){ console.warn('Not in Telegram environment'); }
+
+// Check Elite access
+async function checkEliteAccess(){
+  try{
+    const res = await fetch(eliteCsvUrl());
+    if(res.ok){
+      const text = await res.text();
+      const rows = text.trim().split('\n').map(r=>r.trim().replace(/"/g,''));
+      // Skip header row, check if user ID is in the list
+      const ids = rows.slice(1).map(r=>r.split(',')[0].trim());
+      if(tgUserId && ids.includes(tgUserId)){
+        isElite = true;
+      }
+    }
+  }catch(e){ console.warn('Elite check failed:', e); }
+
+  // ALWAYS update UI and hide loading — even if fetch failed
+  const badge = document.getElementById('accessBadge');
+  if(tgUserId){
+    badge.style.display = '';
+    if(isElite){
+      badge.className = 'tg-access-badge elite';
+      badge.textContent = '⭐ ELITE';
+    } else {
+      badge.className = 'tg-access-badge free';
+      badge.textContent = '🔓 FREE';
+    }
+  }
+  dismissLoading();
+}
+
+function dismissLoading(){
+  const el = document.getElementById('tgLoading');
+  if(el){ el.classList.add('hide'); setTimeout(()=>{ el.style.display='none'; }, 500); }
+}
+
+// ==========================================
+// STATE
+// ==========================================
+let lang = "en", currentPage = 0, simTP = 0, coinTab = "top30";
+let sortCol = "rating", sortDir = "desc", compareList = [], showCompare = false;
+let liveTrades = [], liveWatching = [], liveRecent = [];
+let fetchOk = false, lastFetch = null, countdown = REFRESH_SEC;
+
+// ==========================================
+// STATIC DATA
+// ==========================================
+const COINS_TOP=[{coin:"SOL",rating:8.6,trades:6,winRate:100,avgPnl:60.24,totalPnl:361.4,avgMU:193.1,detect5:100,detect10:83.3,detect20:66.7},{coin:"FLOKI",rating:8.43,trades:21,winRate:47.6,avgPnl:19.96,totalPnl:419.1,avgMU:80.1,detect5:76.2,detect10:52.4,detect20:47.6},{coin:"OM",rating:8.43,trades:33,winRate:57.6,avgPnl:19.33,totalPnl:637.7,avgMU:44.1,detect5:69.7,detect10:45.5,detect20:36.4},{coin:"RAY",rating:8.25,trades:24,winRate:41.7,avgPnl:15.5,totalPnl:372.1,avgMU:50.8,detect5:91.7,detect10:58.3,detect20:50},{coin:"BNX",rating:8.14,trades:16,winRate:56.2,avgPnl:23.45,totalPnl:375.2,avgMU:47.1,detect5:81.2,detect10:75,detect20:68.8},{coin:"MOVR",rating:8.01,trades:11,winRate:63.6,avgPnl:12.8,totalPnl:140.8,avgMU:57.7,detect5:72.7,detect10:72.7,detect20:54.5},{coin:"RAD",rating:7.93,trades:13,winRate:84.6,avgPnl:15.29,totalPnl:198.8,avgMU:31.8,detect5:92.3,detect10:76.9,detect20:69.2},{coin:"SUPER",rating:7.8,trades:19,winRate:47.4,avgPnl:13.41,totalPnl:254.8,avgMU:39.6,detect5:57.9,detect10:52.6,detect20:42.1},{coin:"CYBER",rating:7.76,trades:17,winRate:47.1,avgPnl:10.98,totalPnl:186.7,avgMU:42.9,detect5:70.6,detect10:64.7,detect20:41.2},{coin:"PEPE",rating:7.76,trades:17,winRate:35.3,avgPnl:13.6,totalPnl:231.3,avgMU:63,detect5:58.8,detect10:41.2,detect20:35.3},{coin:"SEI",rating:7.71,trades:38,winRate:39.5,avgPnl:12.75,totalPnl:484.5,avgMU:40.6,detect5:71.1,detect10:57.9,detect20:34.2},{coin:"ZEC",rating:7.54,trades:46,winRate:43.5,avgPnl:14.38,totalPnl:661.5,avgMU:34.6,detect5:54.3,detect10:43.5,detect20:28.3},{coin:"SLP",rating:7.51,trades:7,winRate:71.4,avgPnl:17.26,totalPnl:120.8,avgMU:43.3,detect5:100,detect10:85.7,detect20:57.1},{coin:"CHR",rating:7.39,trades:14,winRate:64.3,avgPnl:13.93,totalPnl:195,avgMU:31.3,detect5:64.3,detect10:64.3,detect20:57.1},{coin:"FET",rating:7.36,trades:19,winRate:36.8,avgPnl:4.88,totalPnl:92.7,avgMU:51.9,detect5:73.7,detect10:57.9,detect20:36.8},{coin:"HBAR",rating:7.22,trades:36,winRate:47.2,avgPnl:6.49,totalPnl:233.5,avgMU:34.8,detect5:69.4,detect10:41.7,detect20:22.2},{coin:"HOT",rating:7.2,trades:11,winRate:45.5,avgPnl:9.51,totalPnl:104.7,avgMU:45.9,detect5:81.8,detect10:63.6,detect20:54.5},{coin:"SYN",rating:7.13,trades:7,winRate:71.4,avgPnl:10.81,totalPnl:75.6,avgMU:35.8,detect5:85.7,detect10:71.4,detect20:71.4},{coin:"MINA",rating:7.1,trades:18,winRate:44.4,avgPnl:8.33,totalPnl:150,avgMU:33.5,detect5:77.8,detect10:55.6,detect20:38.9},{coin:"CTSI",rating:7.08,trades:12,winRate:58.3,avgPnl:8.68,totalPnl:104.1,avgMU:36,detect5:75,detect10:75,detect20:58.3},{coin:"FLOW",rating:7.05,trades:16,winRate:50,avgPnl:12.8,totalPnl:204.8,avgMU:28.9,detect5:68.8,detect10:62.5,detect20:43.8},{coin:"SUI",rating:6.87,trades:20,winRate:30,avgPnl:5.06,totalPnl:101.2,avgMU:41.7,detect5:75,detect10:50,detect20:30},{coin:"XLM",rating:6.87,trades:30,winRate:36.7,avgPnl:7.54,totalPnl:226.3,avgMU:31.5,detect5:40,detect10:26.7,detect20:16.7},{coin:"ARKM",rating:6.83,trades:21,winRate:33.3,avgPnl:1.54,totalPnl:32.4,avgMU:47.8,detect5:71.4,detect10:57.1,detect20:52.4},{coin:"CRV",rating:6.66,trades:25,winRate:44,avgPnl:2.43,totalPnl:60.8,avgMU:35.7,detect5:80,detect10:68,detect20:44},{coin:"JASMY",rating:6.58,trades:26,winRate:34.6,avgPnl:1.05,totalPnl:27.2,avgMU:43.1,detect5:76.9,detect10:61.5,detect20:38.5},{coin:"BONK",rating:6.55,trades:21,winRate:42.9,avgPnl:2.61,totalPnl:54.9,avgMU:33.8,detect5:61.9,detect10:57.1,detect20:33.3},{coin:"PEOPLE",rating:6.48,trades:12,winRate:41.7,avgPnl:2.21,totalPnl:26.5,avgMU:55.4,detect5:83.3,detect10:66.7,detect20:50},{coin:"SHIB",rating:6.42,trades:30,winRate:43.3,avgPnl:3.29,totalPnl:98.6,avgMU:29.3,detect5:56.7,detect10:50,detect20:30},{coin:"ENS",rating:6.37,trades:36,winRate:50,avgPnl:3.04,totalPnl:109.4,avgMU:24.8,detect5:72.2,detect10:47.2,detect20:25}];
+const COINS_EXTRA=[{coin:"DENT",rating:6.54,trades:17,winRate:52.9,avgPnl:6.4,totalPnl:108.9,avgMU:24.1,detect5:88.2,detect10:76.5,detect20:58.8},{coin:"FTT",rating:6.52,trades:19,winRate:47.4,avgPnl:5.24,totalPnl:99.6,avgMU:25.9,detect5:89.5,detect10:63.2,detect20:36.8},{coin:"TRB",rating:6.52,trades:33,winRate:57.6,avgPnl:0.27,totalPnl:8.8,avgMU:30.1,detect5:57.6,detect10:45.5,detect20:36.4},{coin:"MEME",rating:6.47,trades:24,winRate:37.5,avgPnl:5.29,totalPnl:127.1,avgMU:28.6,detect5:79.2,detect10:70.8,detect20:41.7},{coin:"IDEX",rating:6.45,trades:15,winRate:60,avgPnl:6.66,totalPnl:99.8,avgMU:21.3,detect5:93.3,detect10:66.7,detect20:26.7},{coin:"DEXE",rating:6.43,trades:10,winRate:50,avgPnl:6.38,totalPnl:63.8,avgMU:37.6,detect5:90,detect10:60,detect20:40},{coin:"FXS",rating:6.42,trades:21,winRate:57.1,avgPnl:2.71,totalPnl:56.9,avgMU:22.3,detect5:66.7,detect10:52.4,detect20:33.3},{coin:"TRU",rating:6.4,trades:10,winRate:40,avgPnl:4.78,totalPnl:47.8,avgMU:47.1,detect5:80,detect10:80,detect20:60},{coin:"NMR",rating:6.35,trades:12,winRate:50,avgPnl:2.13,totalPnl:25.5,avgMU:42.7,detect5:91.7,detect10:83.3,detect20:66.7},{coin:"ZEN",rating:6.34,trades:30,winRate:53.3,avgPnl:0.67,totalPnl:20.2,avgMU:28.1,detect5:76.7,detect10:63.3,detect20:40},{coin:"AI",rating:6.33,trades:14,winRate:50,avgPnl:5.33,totalPnl:74.6,avgMU:30.4,detect5:85.7,detect10:78.6,detect20:50},{coin:"MLN",rating:6.31,trades:7,winRate:71.4,avgPnl:5.78,totalPnl:40.4,avgMU:29.9,detect5:85.7,detect10:85.7,detect20:57.1},{coin:"AXS",rating:6.27,trades:13,winRate:53.8,avgPnl:7.28,totalPnl:94.6,avgMU:23.9,detect5:61.5,detect10:61.5,detect20:46.2},{coin:"OCEAN",rating:6.24,trades:10,winRate:60,avgPnl:5.02,totalPnl:50.2,avgMU:31.3,detect5:90,detect10:80,detect20:60},{coin:"DOGE",rating:6.18,trades:28,winRate:39.3,avgPnl:1.22,totalPnl:34.2,avgMU:28.7,detect5:60.7,detect10:42.9,detect20:25},{coin:"LINK",rating:6.11,trades:32,winRate:43.8,avgPnl:0.85,totalPnl:27.2,avgMU:25.1,detect5:62.5,detect10:43.8,detect20:25},{coin:"AVAX",rating:6.05,trades:29,winRate:41.4,avgPnl:1.15,totalPnl:33.4,avgMU:26.3,detect5:65.5,detect10:48.3,detect20:27.6},{coin:"ADA",rating:5.98,trades:31,winRate:38.7,avgPnl:0.92,totalPnl:28.5,avgMU:24.8,detect5:58.1,detect10:41.9,detect20:22.6},{coin:"DOT",rating:5.91,trades:27,winRate:40.7,avgPnl:0.78,totalPnl:21.1,avgMU:23.5,detect5:55.6,detect10:40.7,detect20:22.2},{coin:"MATIC",rating:5.85,trades:25,winRate:36,avgPnl:0.55,totalPnl:13.8,avgMU:22.1,detect5:52,detect10:36,detect20:20},{coin:"BTC",rating:5.72,trades:22,winRate:45.5,avgPnl:0.95,totalPnl:20.9,avgMU:18.2,detect5:50,detect10:31.8,detect20:13.6},{coin:"ETH",rating:5.65,trades:24,winRate:41.7,avgPnl:0.72,totalPnl:17.3,avgMU:19.5,detect5:54.2,detect10:33.3,detect20:16.7},{coin:"XRP",rating:5.58,trades:29,winRate:37.9,avgPnl:0.48,totalPnl:13.9,avgMU:21.3,detect5:48.3,detect10:34.5,detect20:17.2},{coin:"UNI",rating:5.45,trades:22,winRate:36.4,avgPnl:-0.15,totalPnl:-3.3,avgMU:20.8,detect5:50,detect10:36.4,detect20:18.2},{coin:"NEAR",rating:5.38,trades:26,winRate:34.6,avgPnl:-0.42,totalPnl:-10.9,avgMU:22.5,detect5:53.8,detect10:38.5,detect20:19.2}];
+const COINS_ALL=[...COINS_TOP,...COINS_EXTRA];
+const SIM_DATA=[{tp:5,wr:67,total:1772},{tp:10,wr:49.8,total:1714},{tp:15,wr:38.9,total:1599},{tp:20,wr:31.7,total:2309}];
+const FALLBACK_RECENT=[{coin:"BAT",direction:"SHORT",entry:"2025-12-14",exit:"2026-02-26",pnl:54.67,mu:60.8,result:"WIN"},{coin:"MEME",direction:"SHORT",entry:"2025-09-01",exit:"2026-02-25",pnl:74.25,mu:76.2,result:"WIN"},{coin:"FLOKI",direction:"SHORT",entry:"2025-10-28",exit:"2026-02-25",pnl:57.13,mu:64,result:"WIN"},{coin:"AVAX",direction:"SHORT",entry:"2026-01-18",exit:"2026-02-25",pnl:26.73,mu:41.8,result:"WIN"},{coin:"ZRO",direction:"SHORT",entry:"2026-02-17",exit:"2026-02-25",pnl:3.91,mu:12.9,result:"WIN"},{coin:"WLD",direction:"SHORT",entry:"2026-02-18",exit:"2026-02-25",pnl:-8.91,mu:4.6,result:"LOSS"},{coin:"HBAR",direction:"SHORT",entry:"2026-02-23",exit:"2026-02-25",pnl:-7.27,mu:2.3,result:"LOSS"},{coin:"DASH",direction:"SHORT",entry:"2026-02-18",exit:"2026-02-23",pnl:10.1,mu:7.9,result:"WIN"},{coin:"NEAR",direction:"SHORT",entry:"2026-02-18",exit:"2026-02-23",pnl:3.54,mu:3.5,result:"WIN"},{coin:"TON",direction:"SHORT",entry:"2026-02-20",exit:"2026-02-23",pnl:-0.9,mu:1.7,result:"LOSS"}];
+liveRecent = FALLBACK_RECENT;
+
+// ==========================================
+// TRANSLATIONS (full EN + AR)
+// ==========================================
+const T={en:{nav:["Overview","Pulse","Coins","Simulator","Track Record","How to Use","Pricing","FAQ"],langBtn:"العربية",heroTag:"LIQUIDITY FLOW DETECTION",heroTitle:"Follow the money. Not the crowd.",heroSub:"Crypto liquidity detection tool that tells you which coins have smart money flowing in today, gives you the zone to watch, and alerts you when to enter.",stat1v:"67%",stat1l:"Move Detection",stat1s:"of zones detect a 5%+ move",stat2v:"6,145",stat2l:"Zones Tested",stat2s:"across 2+ years of data",stat3v:"395",stat3l:"Coins Covered",stat3s:"all Binance USDT pairs",stat4v:"+33%",stat4l:"Avg Detected Move",stat4s:"when the tool is right",funnelTitle:"DETECTION FUNNEL: What happens after a zone is created",funnel:["detected 5%+ move","detected 10%+ move","detected 20%+ move","detected 50%+ move"],benefitsTitle:"What FlowEntry Solves",benefits:[{i:"🎯",t:"Kill FOMO",d:"400+ coins scanned daily. Never miss where money flows."},{i:"🧭",t:"End Uncertainty",d:"Bull or bear? FlowEntry Pulse tells you when the market direction changes, backed by 2+ years of history."},{i:"⚡",t:"No More Paralysis",d:"The bot finds the 5 to 10 coins that matter today. In 15 minutes."},{i:"🌊",t:"Ride the Full Wave",d:"Zones are created BEFORE the move. You're positioned, not chasing."},{i:"📱",t:"Trade from Your Phone",d:"Telegram alerts, see the zone, set your trade, done. 5 minutes."},{i:"🔮",t:"Replace 1,000 Indicators",d:"One tool. One metric. Where is the money flowing?"}],tvTitle:"📜 TradingView Indicators Available",tvDesc:"Every Elite member gets TradingView indicators for every coin on the daily alert. You'll see zones, entries, exits, and signals directly on the chart. You also get a Total Market Cap indicator that shows the Pulse visually so you can see exactly when bull runs start and end.",tgTitle:"Join FlowEntry Telegram",tgDesc:"Free members get daily coin names, delayed Pulse readings, weekly proof posts. Join now to see the bot in action.",tgBtn:"Join Channel",liveTitle:"Live Trades & Watching Zones",liveSub:"Fetched live from the bot — updated every 60 seconds",liveNote:"remaining trades visible for Elite subscribers in the Mini App",watchTitle:"👀 Watching Zones",watchNote:"remaining zones visible for Elite subscribers in the Mini App",closedTitle:"Latest Closed Trades",closedSub:"Most recent trade results from the live bot",tHead:["Coin","Dir","Entry","Exit","P&L","Max Move","Result"],lastUpdated:"Last updated",loading:"Fetching live data...",pulseTag:"MARKET DIRECTION DETECTOR",pulseTitle:"FlowEntry Pulse",pulseSub:"Know when to be aggressive and when to stay in cash",pulseDesc:"FlowEntry Pulse counts how many coins show unusual liquidity flow each day. When this number spikes, smart money is moving, and the market is about to shift. This simple metric has identified every major bull and bear market transition in the last 2+ years.",pulseHow:"How It Works",pulseSteps:["The bot scans 400+ Binance pairs daily and flags any coin where the liquidity flow reaches a statistically significant level (sigma exceeds alpha).","The count of flagged coins IS the Pulse reading.","A spike in the Pulse after a long downtrend signals the bull market is starting.","A spike after a long uptrend signals the bull market is ending."],pulseRead:"Reading the Pulse",pulseG:"25+ alerts = Strong flow. Potential market direction change. Pay close attention.",pulseY:"10 to 24 alerts = Normal activity. Market is moving but no major shift.",pulseR:"Below 10 = Low activity. Stay cautious or stay in cash.",pulseTv:"📜 A TradingView indicator is available for the Total Market Cap chart so you can see the Pulse yourself and track all historical spikes.",srTitle:"🎯 Support & Resistance Discovery",srDesc:"When you increase the sigma filter on any coin's indicator to show only 5 to 10 zones, these zones act as extremely strong support and resistance levels. Use them to find DCA entry areas, spot trend flip levels, and trade bounces or retests at historically significant liquidity zones.",coinsTitle:"Coin Explorer",coinsSub:"Performance by coin",searchPh:"Search coin...",top30:"⭐ Top 30 Rated",allCoins:"📋 All Coins",compare:"Compare",coinH:["Coin","Rating","Detection 5%+","Avg Move","Trades","Win Rate","Total P&L"],top30Note:'Showing top 30 rated coins. Switch to "All Coins" to see all 395.',allNote:" coins (sample). Full dashboard contains 395 coins.",simTitle:"What-If Simulator",simSub:"What if you applied your own take-profit to every FlowEntry zone over 2+ years?",simSelect:"Select your take-profit level",simWR:"Win Rate",simTotal:"Total Return",simTotalSub:"across 6,145 zones",simDesc:"FlowEntry detects the move. You choose when to exit. The numbers above show what happens when you add a simple take-profit rule to every zone over 2+ years. The tool finds the opportunity, your risk management captures the profit.",simWarn:"⚠️ Simulated results assuming a limit take-profit order placed at entry. Past performance does not guarantee future results. This is not financial advice.",trTitle:"Full Track Record",trSub:"6,145 closed trades, every zone logged transparently",trS1:"Closed Trades",trS2:"Win Rate (Raw)",trS3:"Detection Rate",trS4:"Avg Move Detected",trGreen:"Zone-replaced trades: 64% win rate, +10.4% avg profit",trRawTitle:"Raw win rate: 36.3%",trRawDesc:"This number reflects the backtest using the zone boundary as the stop-loss, with no take-profit order. In real trading, if you apply a take-profit or trailing stop, this number changes significantly. For example, a 5% take-profit brings the win rate to 67%. Shown here for full transparency.",trMethod:"Methodology",trSteps:["Zone = [candle low, candle high] on the alert date. This is the price range where liquidity was detected.","Entry: when the daily close goes above the zone, enter LONG. Below the zone, enter SHORT.","Exit: the trade closes when price reverses past the zone (stopout) or when a new alert creates a new zone for that coin.","Max Unrealized = the highest point price reached in your favor during the trade. This shows what the tool detected.","This is a DETECTION TOOL, not a trading strategy. The detection rate (67%) shows how often the tool correctly identifies where price will move."],trLast:"Showing last 10 trades. Full dashboard contains 6,145 trades.",howTag:"GETTING STARTED",howTitle:"How to Use FlowEntry",howSub:"Everything you need to know in 5 minutes",howSteps:[{s:"1",t:"Join the Telegram Channel",d:"Join here: t.me/flowentry3 - All alerts, trade updates, and Pulse readings are delivered to the FlowEntry Telegram channel. Join, turn on notifications, and you'll receive updates automatically.",i:"📲"},{s:"2",t:"Understand the Daily Alert",d:"Every day at 00:05 UTC, the bot scans all 400+ Binance USDT pairs and sends a list of coins with unusual liquidity flow. Each alert includes the coin name, sigma value, and the zone.",i:"📋"},{s:"3",t:"Watch for the Breakout",d:"Once a zone is created, wait for the daily candle to close above the zone (LONG) or below the zone (SHORT). The bot will notify you when this happens.",i:"👀"},{s:"4",t:"Set Your Trade",d:"Open your exchange, set your entry based on the breakout direction. Set your own take-profit and stop-loss. The bot gives you the zone, you manage the risk.",i:"🎯"},{s:"5",t:"Check the Pulse",d:"Before trading, check the FlowEntry Pulse. Green (25+) = strong flow. Red (below 10) = stay cautious. The Pulse tells you the right time to be aggressive or cautious.",i:"🧭"},{s:"6",t:"Track Results",d:"Every zone, every trade, every win and loss is logged on the public dashboard. Verify everything yourself. No hidden trades.",i:"📊"}],howTvTitle:"📜 Optional: TradingView Indicators",howTvDesc:"For users who want to go deeper, FlowEntry generates TradingView indicators for every coin. Add them to your chart to:",howTvItems:["See all historical liquidity zones","Draw your own support and resistance","Find DCA entry areas","Compare zone data across timeframes","Track your favorite coins visually","Verify every alert on your own chart"],howTvNote:"There's also a Total Market indicator that shows you the Market Pulse on the market cap chart in TradingView, so you can see exactly when bull runs start and end.",priceTag:"CHOOSE YOUR PLAN",priceTitle:"Simple Pricing, Real Value",priceSub:"One winning trade pays for the entire year",freeTier:"Free (Scout)",freePrice:"$0",freePeriod:"forever",freeFeatures:["Daily coin names (which coins were flagged)","Market Pulse reading (1-day delayed)","Weekly proof posts and results","Access to public track record","Educational content"],freeCta:"Join Free Channel",eliteTier:"Elite",elitePrice:"$350",elitePeriod:"/year",eliteFeatures:["Everything in Free, plus:","Full zones with entry/exit levels","TradingView indicator for every coin in the daily alert","On-demand indicator for ANY coin at ANY time","Total Market Pulse TradingView indicator","Chart screenshots with zones marked","Same-day Market Pulse (no delay)","Daily summary with top picks","Push notifications for entries and exits","Auto-generated chart images","Weekly analysis video","Private Elite group access","Direct message access for Q&A","Priority support"],eliteCta:"Start Elite",bestValue:"BEST VALUE",founderTag:"🔥 FOUNDING MEMBER OFFER",founderTitle:"Lock in early pricing forever",founderDesc:"First 50 members get Elite at $199/year instead of $350/year. This price is locked forever as long as you stay subscribed. After 50 members, new subscribers pay full price.",founderLabel:"Elite Founder",founderPrice:"$199",founderPer:"/year",mathTitle:"The Math",mathDesc:"One winning trade at 10% on a $1,000 position = $100 profit. That alone covers more than half the yearly subscription. The average detected move is +33%. On a $1,000 position, that's $330. The Elite plan costs $350/year. One good trade and the subscription has paid for itself.",mathUSDT:"Prefer to pay in USDT? Message @theproff2 on Telegram.",faqTitle:"Frequently Asked Questions",faqs:[{q:"Is this just another signal group?",a:"No. FlowEntry is a detection tool, not a signal group. We don't tell you to buy or sell. We show you where money is flowing and give you the zone. Every trade is logged publicly, wins AND losses. 6,145 zones over 2+ years, fully transparent."},{q:"36% win rate sounds terrible",a:"That's the raw backtest number using the zone as stop-loss with no take-profit. The metric that matters: 67% of zones detect a 5%+ move in the right direction, with an average move of +33%. If you add a 10% take-profit, win rate jumps to 50%."},{q:"Can I find this data for free?",a:"Raw volume data? Sure. But scanning 400+ coins daily, identifying abnormal flow using statistical analysis, calculating exact zones, and generating TradingView indicators, all in 15 minutes while you sleep? That's what FlowEntry does."},{q:"How is this different from other bots?",a:"Three things: (1) It detects BEFORE the move. (2) You get the actual TradingView indicator to verify on your own chart. (3) The bull/bear market detector has identified every major market direction change in the last 2 years."},{q:"The market is bearish, why subscribe now?",a:"This is the best time. FlowEntry Pulse tells you when the market direction is about to change. Last time the Pulse spiked after a downtrend, it marked the exact start of the bull run."},{q:"Do I need TradingView?",a:"No. The bot sends coin name, zone, and direction to Telegram. Set your order, done. TradingView indicators are available as an optional extra for users who want more."},{q:"Can you guarantee profits?",a:"No honest person can guarantee profits in any market. The 2-year backtest shows 67% move detection rate. That's a verifiable edge, but edge does not equal guarantee. This is not financial advice."},{q:"Why not just trade it yourself?",a:"We do. But the bot is a tool, and how you trade the information depends on your risk tolerance and exit strategy. Building a sustainable product is smarter than gambling everything on personal trades."},{q:"How do I get started?",a:"Join the free Telegram channel to see the bot in action. When you're ready for full zones and TradingView indicators, upgrade to Elite. Message us on Telegram @theproff2."}],foot1:"FlowEntry | Liquidity Flow Detection Tool | Not Financial Advice",foot2:"Data from backtest Oct 2023 to Feb 2026 | Past performance does not guarantee future results",stepLabel:"Step"},
+ar:{nav:["نظرة عامة","نبض السوق","العملات","ماذا لو","السجل","طريقة الاستخدام","الأسعار","الأسئلة"],langBtn:"English",heroTag:"كشف تدفق السيولة",heroTitle:"إتبع الأموال الذكيه. ليس الاشخاص.",heroSub:"أداة كشف سيولة العملات الرقمية تخبرك أي العملات تتدفق إليها الأموال الذكية اليوم، وتعطيك المنطقة السعريه للمراقبة، وتنبهك عند تفعيل الصفقه.",stat1v:"67%",stat1l:"نسبة كشف حركه السعر",stat1s:"من المناطق تكشف ربح 5%+",stat2v:"6,145",stat2l:"منطقة مختبرة",stat2s:"على مدى أكثر من سنتين",stat3v:"395",stat3l:"عملة مغطاة",stat3s:"جميع أزواج USDT على Binance",stat4v:"+33%",stat4l:"متوسط الحركة المكتشفة",stat4s:"عندما تكون الأداة صحيحة",funnelTitle:"ماذا يحدث بعد إنشاء المنطقة السعريه",funnel:["ربح 5%+","ربح 10%+","ربح 20%+","ربح 50%+"],benefitsTitle:"كيف يساعدك FlowEntry",benefits:[{i:"🎯",t:"تخلص من الفومو",d:"أكثر من 400 عملة يتم فحصها يومياً. لن تفوتك حركة الأموال."},{i:"🧭",t:"انهِ الحيرة",d:"صعود أم هبوط؟ نبض FlowEntry يخبرك عندما يتغير اتجاه السوق."},{i:"⚡",t:"لا مزيد من الشلل",d:"البوت يجد 5 إلى 10 عملات مهمة اليوم. في 15 دقيقة."},{i:"🌊",t:"اركب الموجة كاملة",d:"المناطق تُنشأ قبل الحركة. أنت في وضعيتك، لا تلاحق."},{i:"📱",t:"تداول من هاتفك",d:"تنبيهات تيليجرام، شوف المنطقة، علّق صفقتك، خلاص. 5 دقائق."},{i:"🔮",t:"استبدل 1000 مؤشر",d:"أداة واحدة. مقياس واحد. أين تتدفق الأموال؟"}],tvTitle:"📜 مؤشرات TradingView متاحة",tvDesc:"كل عضو Elite يحصل على مؤشرات TradingView لكل عملة في التنبيه اليومي. سترى المناطق والدخول والخروج والإشارات مباشرة على الشارت.",tgTitle:"انضم لتيليجرام FlowEntry",tgDesc:"الأعضاء المجانيون يحصلون على أسماء العملات اليومية ونبض السوق ومنشورات الإثبات.",tgBtn:"انضم للقناة",liveTitle:"صفقات مباشرة ومناطق مراقبة",liveSub:"بيانات حية من البوت — تُحدّث كل 60 ثانية",liveNote:"باقي الصفقات للمشتركين في خطة Elite عبر التطبيق المصغر",watchTitle:"👀 مناطق المراقبة",watchNote:"باقي المناطق للمشتركين في خطة Elite عبر التطبيق المصغر",closedTitle:"آخر الصفقات المغلقة",closedSub:"أحدث نتائج الصفقات من البوت المباشر",tHead:["العملة","الاتجاه","الدخول","الخروج","الربح/الخسارة","أقصى حركة","النتيجة"],lastUpdated:"آخر تحديث",loading:"جارٍ جلب البيانات الحية...",pulseTag:"كاشف اتجاه السوق",pulseTitle:"نبض FlowEntry",pulseSub:"اعرف متى تكون جريئاً ومتى تبقى في الكاش",pulseDesc:"نبض FlowEntry يحسب عدد العملات التي تظهر تدفق سيولة غير عادي كل يوم. عندما يرتفع هذا الرقم، الأموال الذكية تتحرك والسوق على وشك التغير.",pulseHow:"كيف يعمل",pulseSteps:["البوت يفحص أكثر من 400 زوج على Binance يومياً ويحدد أي عملة يصل فيها تدفق السيولة لمستوى إحصائي مهم.","عدد العملات المحددة هو قراءة النبض.","ارتفاع النبض بعد فترة هبوط طويلة يشير لبداية السوق الصاعد.","ارتفاع بعد فترة صعود طويلة يشير لنهاية السوق الصاعد."],pulseRead:"قراءة النبض",pulseG:"25+ تنبيه = تدفق قوي. احتمال تغيير اتجاه السوق.",pulseY:"10 إلى 24 تنبيه = نشاط عادي. السوق يتحرك لكن بدون تحول كبير.",pulseR:"أقل من 10 = نشاط منخفض. ابقَ حذراً أو ابقَ في الكاش.",pulseTv:"📜 مؤشر TradingView متاح لشارت القيمة السوقية الكلية حتى تتمكن من رؤية النبض بنفسك.",srTitle:"🎯 اكتشاف الدعم والمقاومة",srDesc:"عندما تزيد فلتر السيجما على مؤشر أي عملة لإظهار 5 إلى 10 مناطق فقط، هذه المناطق تعمل كمستويات دعم ومقاومة قوية جداً.",coinsTitle:"مستكشف العملات",coinsSub:"الأداء حسب العملة",searchPh:"ابحث عن عملة...",top30:"⭐ أفضل 30",allCoins:"📋 كل العملات",compare:"مقارنة",coinH:["العملة","التقييم","كشف 5%+","متوسط الحركة","الصفقات","نسبة الربح","إجمالي الربح"],top30Note:'عرض أفضل 30 عملة. انتقل لـ "كل العملات" لرؤية الـ 395.',allNote:" عملة (عينة). اللوحة الكاملة تحتوي 395 عملة.",simTitle:"ماذا لو؟",simSub:"ماذا لو طبّقت جني أرباحك على كل منطقة FlowEntry خلال أكثر من سنتين؟",simSelect:"اختر مستوى جني الأرباح",simWR:"نسبة الربح",simTotal:"إجمالي العائد",simTotalSub:"على 6,145 منطقة",simDesc:"FlowEntry يكشف الحركة. أنت تختار متى تخرج. الأرقام أعلاه توضح ماذا يحدث عند إضافة قاعدة جني أرباح بسيطة.",simWarn:"⚠️ نتائج محاكاة بافتراض أمر جني أرباح محدد عند الدخول. الأداء السابق لا يضمن النتائج المستقبلية. هذه ليست نصيحة مالية.",trTitle:"السجل الكامل",trSub:"6,145 صفقة مغلقة، كل منطقة مسجلة بشفافية",trS1:"صفقات مغلقة",trS2:"نسبة الربح (خام)",trS3:"نسبة الكشف",trS4:"متوسط الحركة",trGreen:"صفقات استبدال المنطقة: 64% نسبة ربح، +10.4% متوسط ربح",trRawTitle:"نسبة الربح الخام: 36.3%",trRawDesc:"يعكس الاختبار باستخدام حدود المنطقة كوقف خسارة بدون جني أرباح. في التداول الحقيقي مع جني أرباح، تتغير النسبة كثيراً.",trMethod:"المنهجية",trSteps:["المنطقة = [أقل سعر, أعلى سعر] في يوم التنبيه.","الدخول: عندما يغلق السعر اليومي فوق المنطقة = شراء. تحت المنطقة = بيع.","الخروج: الصفقة تُغلق عندما ينعكس السعر عبر المنطقة أو عند إنشاء منطقة جديدة لنفس العملة.","أقصى ربح غير محقق = أعلى نقطة وصلها السعر في صالحك خلال الصفقة.","هذه أداة كشف وليست استراتيجية تداول. نسبة الكشف (67%) توضح دقة الأداة."],trLast:"عرض آخر 10 صفقات. اللوحة الكاملة تحتوي 6,145 صفقة.",howTag:"البداية",howTitle:"كيف تستخدم FlowEntry",howSub:"كل ما تحتاج معرفته في 5 دقائق",howSteps:[{s:"1",t:"انضم لقناة تيليجرام",d:"انضم هنا: t.me/flowentry3 - كل التنبيهات وتحديثات الصفقات.",i:"📲"},{s:"2",t:"افهم التنبيه اليومي",d:"كل يوم الساعة 00:05 UTC، البوت يفحص 400+ عملة ويرسل قائمة العملات ذات التدفق غير العادي.",i:"📋"},{s:"3",t:"راقب الاختراق",d:"انتظر إغلاق الشمعة اليومية فوق المنطقة (شراء) أو تحتها (بيع). البوت سينبهك.",i:"👀"},{s:"4",t:"علّق صفقتك",d:"افتح منصتك، حدد دخولك حسب اتجاه الاختراق. حدد جني الأرباح ووقف الخسارة بنفسك.",i:"🎯"},{s:"5",t:"تحقق من النبض",d:"قبل التداول، تحقق من نبض FlowEntry. أخضر (25+) = تدفق قوي. أحمر (أقل من 10) = ابقَ حذراً.",i:"🧭"},{s:"6",t:"تابع النتائج",d:"كل منطقة وكل صفقة مسجلة علناً. تحقق من السجل الكامل بنفسك.",i:"📊"}],howTvTitle:"📜 اختياري: مؤشرات TradingView",howTvDesc:"للمستخدمين الذين يريدون التعمق أكثر:",howTvItems:["رؤية جميع مناطق السيولة التاريخية","رسم الدعم والمقاومة بنفسك","إيجاد مناطق DCA","مقارنة بيانات المناطق","متابعة عملاتك المفضلة بصرياً","التحقق من كل تنبيه على الشارت"],howTvNote:"يوجد أيضاً مؤشر للسوق الكلي يعرض نبض السوق على شارت القيمة السوقية.",priceTag:"اختر خطتك",priceTitle:"أسعار بسيطة، قيمة حقيقية",priceSub:"صفقة رابحة واحدة تدفع ثمن السنة كاملة",freeTier:"مجاني",freePrice:"$0",freePeriod:"للأبد",freeFeatures:["أسماء العملات اليومية","قراءة نبض السوق (متأخرة يوم واحد)","منشورات إثبات ونتائج أسبوعية","الوصول لسجل العملات العام","محتوى تعليمي"],freeCta:"انضم للقناة المجانية",eliteTier:"إيليت",elitePrice:"$350",elitePeriod:"/سنة",eliteFeatures:["كل ما في المجاني، بالإضافة إلى:","المناطق السعريه الكاملة مع مستويات الدخول والخروج","مؤشر TradingView لكل عملة","مؤشر عند الطلب لأي عملة","مؤشر نبض السوق لشارت الماركت كاب","صوره شارت العمله مع المناطق","تحديث نبض السوق في نفس اليوم","ملخص يومي مع أفضل الاختيارات","إشعارات فورية للدخول والخروج","صور شارت العملات تلقائياً","فيديو تحليل أسبوعي","مجموعة Elite الخاصة","رسائل مباشرة للأسئلة","دعم مع الأولويه"],eliteCta:"ابدأ Elite",bestValue:"الأكثر طلباً",founderTag:"🔥 عرض الأعضاء المؤسسين",founderTitle:"احجز السعر المبكر للأبد",founderDesc:"أول 50 عضو يحصلون على Elite بسعر $199/سنة بدلاً من $350/سنة. هذا السعر لن يتغير للأبد طالما اشتراكك فعّال.",founderLabel:"إيليت مؤسس",founderPrice:"$199",founderPer:"/سنة",mathTitle:"الحسبة",mathDesc:"صفقة رابحة واحدة بنسبة 10% على مركز $1,000 = ربح $100. متوسط الحركة المكتشفة +33%. على $1,000 هذا يعني $330. خطة Elite تكلف $350/سنة.",mathUSDT:"تفضل الدفع بـ USDT؟ راسل @theproff2 على تيليجرام.",faqTitle:"الأسئلة الشائعة",faqs:[{q:"هل هذه مجرد قناه توصيات؟",a:"لا. FlowEntry أداة كشف وليست قناه توصيات. كل صفقة مسجلة علناً."},{q:"نسبة ربح 36% تبدو سيئة",a:"هذا رقم الاختبار الخام. المقياس المهم: 67% من المناطق تكشف حركة 5%+. إذا أضفت جني أرباح 10%، نسبة الربح ترتفع إلى 50%."},{q:"هل يمكنني إيجاد هذه البيانات مجاناً؟",a:"بيانات الحجم الخام؟ نعم. لكن فحص 400+ عملة يومياً وتحليلها في 15 دقيقة؟ هذا ما يفعله FlowEntry."},{q:"ما الفرق بين هذا والبوتات الأخرى؟",a:"(1) يكشف قبل الحركة. (2) تحصل على مؤشر TradingView للتحقق بنفسك. (3) كاشف السوق حدد كل تغيير رئيسي في السنتين الماضيتين."},{q:"السوق هابط، لماذا أشترك الآن؟",a:"هذا أفضل وقت. نبض السوق يخبرك عندما يوشك اتجاه السوق على التغيير."},{q:"هل أحتاج TradingView؟",a:"لا. البوت يرسل كل شيء على تيليجرام. مؤشرات TradingView إضافة اختيارية."},{q:"هل تضمنون الأرباح؟",a:"لا. اختبار السنتين يظهر نسبة كشف 67%. هذه ميزة حقيقية لكنها ليست ضماناً."},{q:"لماذا لا تتداولها بنفسك؟",a:"نحن نستخدمها. بناء منتج مستدام أذكى من المراهنة بكل شيء على صفقات شخصية."},{q:"كيف أبدأ؟",a:"انضم لقناة تيليجرام المجانية. عندما تكون جاهزاً، ارتقِ لخطة Elite. راسلنا @theproff2."}],foot1:"FlowEntry | أداة كشف تدفق السيولة | ليست نصيحة مالية",foot2:"بيانات من اختبار أكتوبر 2023 إلى فبراير 2026 | الأداء السابق لا يضمن النتائج المستقبلية",stepLabel:"خطوة"}};
+
+// ==========================================
+// CSV PARSER
+// ==========================================
+function parseCSV(text){
+  const lines=text.trim().split("\n");if(lines.length<2)return[];
+  const hdr=lines[0].split(",").map(h=>h.trim().replace(/"/g,""));
+  return lines.slice(1).map(l=>{const v=l.split(",").map(x=>x.trim().replace(/"/g,""));const o={};hdr.forEach((h,i)=>{o[h]=v[i]||""});return o});
+}
+
+// ==========================================
+// RENDERING ENGINE
+// ==========================================
+function t(key){return T[lang][key]||key}
+function isAr(){return lang==="ar"}
+
+function pill(text,color,bg){return `<span class="pill" style="background:${bg||color+'18'};color:${color}">${text}</span>`}
+function statBox(v,l,s,big){return `<div class="stat-box${big?' big':''}"><div class="stat-val">${v}</div><div class="stat-label">${l}</div>${s?`<div class="stat-sub">${s}</div>`:''}</div>`}
+
+function renderTradeTable(data,containerId){
+  const h=t('tHead');
+  let html=`<table class="data-table"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
+  data.forEach(r=>{
+    const pc=r.pnl>=0?'var(--green)':'var(--red)';
+    const rc=r.result==='WIN'?'var(--green)':'var(--red)';
+    const rbg=r.result==='WIN'?'rgba(22,101,52,0.27)':'rgba(127,29,29,0.27)';
+    const dc=r.direction==='LONG'?'var(--green)':'var(--red)';
+    html+=`<tr><td style="font-weight:700">${r.coin}</td><td>${pill(r.direction,dc)}</td><td style="color:var(--text-dim)">${r.entry}</td><td style="color:var(--text-dim)">${r.exit||'—'}</td><td style="font-weight:700;color:${pc}">${r.pnl>=0?'+':''}${r.pnl}%</td><td style="color:var(--gold)">${r.mu}%</td><td>${pill(r.result,rc,rbg)}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById(containerId).innerHTML=html;
+}
+
+function renderAll(){
+  const tx=T[lang];
+  document.documentElement.dir=isAr()?'rtl':'ltr';
+  document.documentElement.lang=isAr()?'ar':'en';
+
+  // Text bindings
+  document.querySelectorAll('[data-t]').forEach(el=>{
+    const k=el.getAttribute('data-t');
+    if(tx[k]!=null) el.textContent=tx[k];
+  });
+
+  // Nav — hide Pricing page (index 6) for Elite users
+  const nav=document.getElementById('nav');
+  nav.innerHTML=tx.nav.map((n,i)=>{
+    if(isElite && i===6) return ''; // Hide pricing for Elite
+    return `<button class="nav-btn${currentPage===i?' active':''}" onclick="goPage(${i})">${n}</button>`;
+  }).join('');
+  document.getElementById('langBtn').textContent=tx.langBtn;
+
+  // Pages
+  for(let i=0;i<8;i++){const p=document.getElementById('page'+i);p.classList.toggle('active',i===currentPage)}
+
+  // Hero stats
+  document.getElementById('heroStats').innerHTML=[
+    statBox(tx.stat1v,tx.stat1l,tx.stat1s,true),statBox(tx.stat2v,tx.stat2l,tx.stat2s,true),
+    statBox(tx.stat3v,tx.stat3l,tx.stat3s,true),statBox(tx.stat4v,tx.stat4l,tx.stat4s,true)
+  ].join('');
+
+  // Funnel
+  const pcts=[67,50,32,12],alphas=['55','44','33','22'],widths=['100%','78%','54%','28%'];
+  document.getElementById('funnel').innerHTML=pcts.map((p,i)=>`<div style="margin-bottom:8px;display:flex;align-items:center;gap:12px;justify-content:center"><div style="font-size:20px;font-weight:800;color:var(--gold);min-width:55px;text-align:${isAr()?'left':'right'}">${p}%</div><div style="width:${widths[i]};max-width:400px;height:28px;background:linear-gradient(90deg,rgba(201,162,39,0.${alphas[i]}),transparent);border-radius:6px;display:flex;align-items:center;padding-left:12px"><span style="font-size:11px;font-weight:500">${tx.funnel[i]}</span></div></div>`).join('');
+
+  // Benefits
+  document.getElementById('benefits').innerHTML=tx.benefits.map(b=>`<div class="benefit-card"><div class="benefit-icon">${b.i}</div><div class="benefit-title">${b.t}</div><div class="benefit-desc">${b.d}</div></div>`).join('');
+
+  // Live status
+  const statusEl=document.getElementById('liveStatus');
+  if(lastFetch){statusEl.innerHTML=`<span class="live-dot ok"></span>${tx.lastUpdated}: ${lastFetch.toLocaleTimeString()} · ${countdown}s`}
+  else{statusEl.innerHTML=`<span class="live-dot err"></span>${tx.loading}`}
+
+  // Live trades — Elite sees ALL, Free sees 1 trade + 2 watching
+  const tradeLimit = isElite ? liveTrades.length : 1;
+  const watchLimit = isElite ? liveWatching.length : 2;
+  const pubTrades=liveTrades.slice(0,tradeLimit), hiddenT=Math.max(0,liveTrades.length-tradeLimit);
+  const pubWatch=liveWatching.slice(0,watchLimit), hiddenW=Math.max(0,liveWatching.length-watchLimit);
+
+  if(pubTrades.length>0){
+    document.getElementById('liveTradesContainer').innerHTML=pubTrades.map(tr=>{
+      const dc=tr.direction==='LONG'?'var(--green)':tr.direction==='SHORT'?'var(--red)':'var(--text-dim)';
+      return `<div class="trade-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:16px;font-weight:800">${tr.coin}</span>${pill(tr.direction,dc)}</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:3px">Entry: ${tr.entryPrice||'—'} on ${tr.entry}</div><div style="font-size:11px;color:var(--text-dim);margin-bottom:3px">Zone: ${tr.zone}</div><div style="font-size:14px;font-weight:700;color:var(--green);margin-top:6px">${tr.unrealized} unrealized</div></div>`}).join('');
+  } else {
+    document.getElementById('liveTradesContainer').innerHTML=`<div style="font-size:12px;color:var(--text-dim);padding:16px">No open trades right now</div>`;
+  }
+  document.getElementById('liveTradesNote').innerHTML=hiddenT>0?`<div class="elite-note"><span>🔒 +${hiddenT} ${tx.liveNote}</span>${!isElite&&tgUserId?'<div class="tg-upgrade-banner" onclick="goPage(6)"><span style=\"font-size:20px\">⭐</span><div><div style=\"font-size:12px;font-weight:700;color:var(--gold)\">'+(lang==='ar'?'ترقية إلى Elite':'Upgrade to Elite')+'</div><div style=\"font-size:11px;color:var(--text-dim)\">'+(lang==='ar'?'شاهد كل الصفقات والزونات':'See all trades & zones live')+'</div></div></div>':''}</div>`:'';
+
+  if(pubWatch.length>0){
+    document.getElementById('watchContainer').innerHTML=pubWatch.map(w=>`<div class="watch-card"><div style="font-size:14px;font-weight:700;color:var(--gold)">${w.coin}</div><div style="font-size:11px;color:var(--text-dim)">Zone: ${w.zone}</div><div style="font-size:11px;color:var(--text-dim)">Sigma: ${w.sigma} | Since: ${w.since}</div></div>`).join('');
+  }
+  document.getElementById('watchNote').innerHTML=hiddenW>0?`<div class="elite-note"><span>🔒 +${hiddenW} ${tx.watchNote}</span></div>`:'';
+
+  // Overview + Track Record tables
+  renderTradeTable(liveRecent,'overviewTable');
+  renderTradeTable(liveRecent,'trTable');
+
+  // Pulse steps
+  document.getElementById('pulseSteps').innerHTML=tx.pulseSteps.map((s,i)=>`<div style="display:flex;gap:12px;margin-bottom:12px"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--gold);flex-shrink:0">${i+1}</div><div style="font-size:13px;color:var(--text-dim);line-height:1.6;padding-top:4px">${s}</div></div>`).join('');
+
+  // Pulse colors
+  const pColors=[{c:'var(--green)',i:'🟢',t:tx.pulseG},{c:'#eab308',i:'🟡',t:tx.pulseY},{c:'var(--red)',i:'🔴',t:tx.pulseR}];
+  document.getElementById('pulseColors').innerHTML=pColors.map(r=>`<div style="background:var(--card);border:1px solid ${r.c}22;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px"><span style="font-size:20px">${r.i}</span><span style="font-size:13px;color:var(--text-dim)">${r.t}</span></div>`).join('');
+
+  // Coins page
+  document.getElementById('coinSearch').placeholder=tx.searchPh;
+  document.getElementById('tabTop30').textContent=tx.top30;
+  document.getElementById('tabTop30').className='tab-btn'+(coinTab==='top30'?' active':'');
+  document.getElementById('tabAll').textContent=tx.allCoins;
+  document.getElementById('tabAll').className='tab-btn'+(coinTab==='all'?' active':'');
+  renderCoins();
+
+  // Simulator
+  document.getElementById('simButtons').innerHTML=SIM_DATA.map((s,i)=>`<button class="sim-btn${simTP===i?' active':''}" onclick="setSimTP(${i})">${s.tp}%</button>`).join('');
+  const sim=SIM_DATA[simTP];
+  document.getElementById('simStats').innerHTML=statBox(sim.wr+'%',tx.simWR,'',true)+statBox('+'+sim.total.toLocaleString()+'%',tx.simTotal,tx.simTotalSub,true);
+  document.getElementById('simBars').innerHTML=SIM_DATA.map((s,i)=>{
+    const act=simTP===i;const w=(s.total/2400*100)+'%';
+    const bg=act?'linear-gradient(90deg,var(--gold),var(--gold-light))':'var(--border)';
+    return `<div style="margin-bottom:14px;display:flex;align-items:center;gap:12px"><div style="min-width:50px;font-size:13px;font-weight:700;color:${act?'var(--gold)':'var(--text-dim)'}">TP ${s.tp}%</div><div style="flex:1;height:32px;background:var(--bg);border-radius:8px;overflow:hidden"><div style="width:${w};height:100%;background:${bg};border-radius:8px;transition:all 0.4s;display:flex;align-items:center;padding-left:10px"><span style="font-size:11px;font-weight:700;color:${act?'var(--bg)':'var(--text-dim)'}">+${s.total.toLocaleString()}%</span></div></div><div style="min-width:55px;font-size:12px;font-weight:600;color:${act?'var(--green)':'var(--text-dim)'}">${s.wr}% WR</div></div>`}).join('');
+
+  // Track record stats
+  document.getElementById('trStats').innerHTML=[statBox('6,145',tx.trS1),statBox('36.3%',tx.trS2),statBox('67%',tx.trS3),statBox('+33%',tx.trS4)].join('');
+  document.getElementById('trMethodSteps').innerHTML=tx.trSteps.map((m,i)=>`<div style="display:flex;gap:10px;margin-bottom:10px"><span style="color:var(--gold);font-size:14px;flex-shrink:0;margin-top:1px">→</span><span style="font-size:13px;color:${i===4?'var(--gold)':'var(--text-dim)'};line-height:1.6;font-weight:${i===4?600:400}">${m}</span></div>`).join('');
+
+  // How to Use
+  const sl=isAr()?tx.stepLabel:'Step';
+  document.getElementById('howSteps').innerHTML=tx.howSteps.map(s=>`<div class="how-step"><div class="how-icon">${s.i}</div><div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="step-badge">${sl} ${s.s}</span><span style="font-size:15px;font-weight:700">${s.t}</span></div><p style="font-size:13px;color:var(--text-dim);line-height:1.7;margin:0">${s.d}</p></div></div>`).join('');
+  document.getElementById('howTvItems').innerHTML=tx.howTvItems.map(x=>`<div style="background:var(--accent1);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--gold);font-weight:500">✓ ${x}</div>`).join('');
+
+  // Pricing
+  let pcHtml=`<div class="price-card free"><div style="font-size:16px;font-weight:700;color:var(--text-dim);margin-bottom:8px">${tx.freeTier}</div><div style="display:flex;align-items:baseline;gap:4px;margin-bottom:16px"><span style="font-size:36px;font-weight:900">${tx.freePrice}</span><span style="font-size:13px;color:var(--text-dim)">${tx.freePeriod}</span></div>`;
+  tx.freeFeatures.forEach(f=>{pcHtml+=`<div style="font-size:12px;color:var(--text-dim);padding:4px 0;display:flex;gap:6px;line-height:1.5"><span style="color:var(--text-dim);flex-shrink:0">✓</span><span>${f}</span></div>`});
+  pcHtml+=`<a href="https://t.me/flowentry3" target="_blank" style="display:block;margin-top:16px;border:1px solid var(--text-dim);border-radius:10px;padding:10px 0;text-align:center;font-size:13px;font-weight:700;color:var(--text-dim)">${tx.freeCta}</a></div>`;
+  pcHtml+=`<div class="price-card elite"><div class="best-badge">${tx.bestValue}</div><div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:8px">${tx.eliteTier}</div><div style="display:flex;align-items:baseline;gap:4px;margin-bottom:16px"><span style="font-size:36px;font-weight:900">${tx.elitePrice}</span><span style="font-size:13px;color:var(--text-dim)">${tx.elitePeriod}</span></div>`;
+  tx.eliteFeatures.forEach((f,j)=>{pcHtml+=`<div style="font-size:12px;color:${j===0?'var(--gold)':'var(--text-dim)'};padding:4px 0;display:flex;gap:6px;line-height:1.5"><span style="color:var(--gold);flex-shrink:0">${j===0?'↑':'✓'}</span><span>${f}</span></div>`});
+  pcHtml+=`<a href="https://t.me/theproff2" target="_blank" style="display:block;margin-top:16px;background:var(--gold);border-radius:10px;padding:10px 0;text-align:center;font-size:13px;font-weight:700;color:var(--bg)">${tx.eliteCta}</a></div>`;
+  document.getElementById('priceCards').innerHTML=pcHtml;
+
+  // Founder
+  document.getElementById('founderBox').innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:6px">${tx.founderTag}</div><div style="font-size:18px;font-weight:800;margin-bottom:6px">${tx.founderTitle}</div><div style="font-size:13px;color:var(--text-dim);line-height:1.6;max-width:480px;margin:0 auto 12px">${tx.founderDesc}</div><div style="background:var(--accent1);border-radius:10px;padding:10px 20px;display:inline-block"><div style="font-size:11px;color:var(--text-dim)">${tx.founderLabel}</div><div style="font-size:22px;font-weight:800;color:var(--gold)">${tx.founderPrice}<span style="font-size:12px;font-weight:400">${tx.founderPer}</span></div></div>`;
+
+  // FAQ
+  document.getElementById('faqContainer').innerHTML=tx.faqs.map((f,i)=>`<div class="faq-item" id="faq${i}"><div class="faq-q" onclick="toggleFaq(${i})"><span>${f.q}</span><span class="faq-toggle">+</span></div><div class="faq-a">${f.a}</div></div>`).join('');
+}
+
+function renderCoins(){
+  const tx=T[lang];
+  const coins=coinTab==='top30'?COINS_TOP:COINS_ALL;
+  const q=(document.getElementById('coinSearch').value||'').toLowerCase();
+  let filtered=coins.filter(x=>x.coin.toLowerCase().includes(q));
+  filtered.sort((a,b)=>sortDir==='desc'?b[sortCol]-a[sortCol]:a[sortCol]-b[sortCol]);
+
+  const keys=['coin','rating','detect5','avgMU','trades','winRate','totalPnl'];
+  let html='<table class="data-table"><thead><tr><th style="width:30px"></th>';
+  tx.coinH.forEach((h,i)=>{
+    const k=keys[i];const s=k!=='coin';
+    html+=`<th class="${s?'sortable':''} ${sortCol===k?'sorted':''}" ${s?`onclick="sortCoins('${k}')"`:''} >${h} ${sortCol===k?(sortDir==='desc'?'↓':'↑'):''}</th>`;
+  });
+  html+='</tr></thead><tbody>';
+  filtered.forEach((x,i)=>{
+    const detC=x.detect5>=70?'var(--green)':x.detect5>=50?'#eab308':'var(--red)';
+    const pnlC=x.totalPnl>=0?'var(--green)':'var(--red)';
+    const ratC=x.rating>=7?'var(--green)':x.rating>=5?'#eab308':'var(--text-dim)';
+    const checked=compareList.includes(x.coin)?'checked':'';
+    html+=`<tr><td><input type="checkbox" ${checked} onchange="toggleCmp('${x.coin}')" style="accent-color:var(--gold);cursor:pointer"></td><td style="font-weight:700">${x.coin}</td><td><span style="color:${ratC};font-weight:700">${x.rating}</span></td><td><span class="det-bar"><span class="det-fill" style="width:${x.detect5}%;background:${detC}"></span></span><span style="font-size:11px;font-weight:600;color:var(--text-dim)">${x.detect5}%</span></td><td style="color:var(--gold);font-weight:600">${x.avgMU}%</td><td style="color:var(--text-dim)">${x.trades}</td><td style="color:${x.winRate>=50?'var(--green)':'var(--text-dim)'}">${x.winRate}%</td><td style="font-weight:700;color:${pnlC}">${x.totalPnl>=0?'+':''}${x.totalPnl}%</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('coinTableContainer').innerHTML=html;
+  document.getElementById('coinNote').textContent=coinTab==='top30'?tx.top30Note:COINS_ALL.length+tx.allNote;
+
+  // Compare button
+  const cb=document.getElementById('compareBtn');
+  if(compareList.length>0){cb.style.display='';cb.textContent=tx.compare+' ('+compareList.length+')';cb.className='tab-btn'+(showCompare?' active':'');} else {cb.style.display='none';showCompare=false}
+
+  // Compare panel
+  if(showCompare&&compareList.length>0){
+    const cc=coins.filter(x=>compareList.includes(x.coin));
+    document.getElementById('comparePanel').style.display='';
+    document.getElementById('comparePanel').innerHTML=`<div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:12px">${tx.compare}</div><div class="flex gap-12" style="overflow-x:auto">${cc.map(x=>`<div class="compare-card"><div style="font-size:16px;font-weight:800;color:var(--gold);margin-bottom:10px">${x.coin}</div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">Rating: <span style="color:var(--text);font-weight:700">${x.rating}/10</span></div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">Detection 5%+: <span style="color:var(--green);font-weight:700">${x.detect5}%</span></div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">Avg Move: <span style="color:var(--gold);font-weight:700">${x.avgMU}%</span></div><div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">Trades: <span style="color:var(--text);font-weight:700">${x.trades}</span></div><div style="font-size:12px;color:var(--text-dim)">Total P&L: <span style="color:${x.totalPnl>=0?'var(--green)':'var(--red)'};font-weight:700">${x.totalPnl>=0?'+':''}${x.totalPnl}%</span></div></div>`).join('')}</div>`;
+  } else {document.getElementById('comparePanel').style.display='none'}
+}
+
+// ==========================================
+// ACTIONS
+// ==========================================
+function goPage(i){currentPage=i;renderAll();window.scrollTo(0,0)}
+function toggleLang(){lang=lang==='en'?'ar':'en';renderAll()}
+function setSimTP(i){simTP=i;renderAll()}
+function setCoinTab(t){coinTab=t;renderAll()}
+function sortCoins(col){if(sortCol===col)sortDir=sortDir==='desc'?'asc':'desc';else{sortCol=col;sortDir='desc'}renderCoins()}
+function toggleCmp(coin){if(compareList.includes(coin))compareList=compareList.filter(x=>x!==coin);else if(compareList.length<3)compareList.push(coin);renderCoins()}
+function toggleComparePanel(){showCompare=!showCompare;renderCoins()}
+function toggleFaq(i){const el=document.getElementById('faq'+i);el.classList.toggle('open')}
+
+// ==========================================
+// LIVE DATA FETCH
+// ==========================================
+async function fetchLiveData(){
+  try{
+    const otRes=await fetch(csvUrl(GIDS.openTrades));
+    if(otRes.ok){const rows=parseCSV(await otRes.text());if(rows.length>0){liveTrades=rows.map(r=>({coin:r.Coin||r.coin||'—',direction:r.Direction||r.direction||'—',entry:r['Entry Date']||r.entry_date||'—',entryPrice:r['Entry Price']||r.entry_price||'—',zone:`${r['Zone Low']||r.zone_low||'?'} – ${r['Zone High']||r.zone_high||'?'}`,unrealized:r['Live P&L %']?`${parseFloat(r['Live P&L %'])>=0?'+':''}${r['Live P&L %']}%`:'—',status:'ACTIVE'}))}}
+
+    const wRes=await fetch(csvUrl(GIDS.watching));
+    if(wRes.ok){const rows=parseCSV(await wRes.text());if(rows.length>0){liveWatching=rows.map(r=>({coin:r.Coin||r.coin||'—',zone:`${r['Zone Low']||r.zone_low||'?'} – ${r['Zone High']||r.zone_high||'?'}`,sigma:r.Sigma||r.sigma||'—',since:r['Alert Date']||r.alert_date||'—'}))}}
+
+    const trRes=await fetch(csvUrl(GIDS.trackRecord));
+    if(trRes.ok){const rows=parseCSV(await trRes.text());if(rows.length>0){liveRecent=rows.slice(0,10).map(r=>({coin:r.Coin||r.coin||'—',direction:r.Direction||r.direction||'—',entry:r['Entry Date']||r.entry_date||'—',exit:r['Exit Date']||r.exit_date||'—',pnl:parseFloat(r['P&L %']||r.pnl_percent||0),mu:parseFloat(r['Max Unrealized %']||r.max_unrealized_pct||0),result:r.Result||r.status||'—'}))}}
+
+    lastFetch=new Date();fetchOk=true;countdown=REFRESH_SEC;
+  }catch(e){console.warn('Fetch error:',e);fetchOk=false}
+  renderAll();
+}
+
+// ==========================================
+// INIT
+// ==========================================
+// Initial render (loading state)
+renderAll();
+
+// Safety net: ALWAYS dismiss loading after 5 seconds no matter what
+setTimeout(dismissLoading, 5000);
+
+// Check Elite access, then fetch live data
+(async function init(){
+  if(!tgUserId){
+    // Not in Telegram — dismiss immediately, show as free
+    dismissLoading();
+  } else {
+    await checkEliteAccess();
+  }
+  await fetchLiveData();
+  renderAll();
+})();
+
+setInterval(fetchLiveData, REFRESH_SEC*1000);
+setInterval(()=>{countdown=Math.max(0,countdown-1);const s=document.getElementById('liveStatus');if(s&&lastFetch){const tx=T[lang];s.innerHTML=`<span class="live-dot ok"></span>${tx.lastUpdated}: ${lastFetch.toLocaleTimeString()} · ${countdown}s`}},1000);
+</script>
+</body>
+</html>
