@@ -422,17 +422,18 @@ try {
 async function checkEliteAccess(){
   try{
     const res = await fetch(eliteCsvUrl());
-    if(!res.ok) return;
-    const text = await res.text();
-    const rows = text.trim().split('\n').map(r=>r.trim().replace(/"/g,''));
-    // Skip header row, check if user ID is in the list
-    const ids = rows.slice(1).map(r=>r.split(',')[0].trim());
-    if(tgUserId && ids.includes(tgUserId)){
-      isElite = true;
+    if(res.ok){
+      const text = await res.text();
+      const rows = text.trim().split('\n').map(r=>r.trim().replace(/"/g,''));
+      // Skip header row, check if user ID is in the list
+      const ids = rows.slice(1).map(r=>r.split(',')[0].trim());
+      if(tgUserId && ids.includes(tgUserId)){
+        isElite = true;
+      }
     }
   }catch(e){ console.warn('Elite check failed:', e); }
 
-  // Update UI based on access level
+  // ALWAYS update UI and hide loading — even if fetch failed
   const badge = document.getElementById('accessBadge');
   if(tgUserId){
     badge.style.display = '';
@@ -444,13 +445,12 @@ async function checkEliteAccess(){
       badge.textContent = '🔓 FREE';
     }
   }
+  dismissLoading();
+}
 
-  // Hide loading overlay
-  document.getElementById('tgLoading').classList.add('hide');
-  setTimeout(()=>{ document.getElementById('tgLoading').style.display='none'; }, 500);
-
-  // Re-render with correct access level
-  renderAll();
+function dismissLoading(){
+  const el = document.getElementById('tgLoading');
+  if(el){ el.classList.add('hide'); setTimeout(()=>{ el.style.display='none'; }, 500); }
 }
 
 // ==========================================
@@ -696,16 +696,19 @@ async function fetchLiveData(){
 // Initial render (loading state)
 renderAll();
 
+// Safety net: ALWAYS dismiss loading after 5 seconds no matter what
+setTimeout(dismissLoading, 5000);
+
 // Check Elite access, then fetch live data
 (async function init(){
-  // If not in Telegram, hide loading immediately and show as free
   if(!tgUserId){
-    document.getElementById('tgLoading').classList.add('hide');
-    setTimeout(()=>{ document.getElementById('tgLoading').style.display='none'; }, 500);
+    // Not in Telegram — dismiss immediately, show as free
+    dismissLoading();
   } else {
     await checkEliteAccess();
   }
   await fetchLiveData();
+  renderAll();
 })();
 
 setInterval(fetchLiveData, REFRESH_SEC*1000);
